@@ -1,7 +1,7 @@
 import pandas as pd
-import numpy as np 
+import numpy as np
 import dash
-from dash import dcc, html
+from dash import dcc, html, dash_table
 from dash.dependencies import Input, Output
 import plotly.express as px
 import plotly.graph_objects as go
@@ -163,11 +163,26 @@ app.layout = html.Div([
     
     html.Button('Run Strategy', id='run-button', n_clicks=0),
     
-    dcc.Graph(id='portfolio-value-graph')
+    dcc.Graph(id='portfolio-value-graph'),
+    
+    html.H2("Transaction Details"),
+    dash_table.DataTable(
+        id='transaction-table',
+        columns=[
+            {'name': 'Timestamp', 'id': 'timestamp'},
+            {'name': 'USDT Balance', 'id': 'usdtBalance'},
+            {'name': 'Bitcoin Balance', 'id': 'bitcoinBalance'},
+            {'name': 'Bitcoin Value', 'id': 'bitcoinValue'},
+            {'name': 'Asset Value', 'id': 'assetValue'}
+        ],
+        data=[],
+        page_size=10
+    )
 ])
 
 @app.callback(
     Output('portfolio-value-graph', 'figure'),
+    Output('transaction-table', 'data'),
     Input('run-button', 'n_clicks'),
     Input('start-date-picker', 'date'),
     Input('end-date-picker', 'date'),
@@ -177,14 +192,17 @@ def update_graph(n_clicks, start_date, end_date, initial_amount):
     if n_clicks > 0:
         balance_df = strategy1(start_date, end_date, initial_amount)
         if balance_df.empty:
-            return go.Figure()
-        
+            return go.Figure(), []
+
         balance_df['timestamp'] = pd.to_datetime(balance_df['timestamp'], unit='s')
         fig = px.line(balance_df, x='timestamp', y='assetValue', title='Portfolio Growth Over Time')
         fig.update_xaxes(title='Date')
         fig.update_yaxes(title='Portfolio Value (USDT)')
-        return fig
-    return go.Figure()
+
+        table_data = balance_df.to_dict('records')
+        return fig, table_data
+
+    return go.Figure(), []
 
 if __name__ == '__main__':
     app.run_server(debug=True)
