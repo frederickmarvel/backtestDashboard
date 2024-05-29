@@ -101,7 +101,18 @@ def strategy1(start_date, end_date, initial_balance):
     if not filtered_data.empty:
         initial_value = getValue(filtered_data.index[0])
         timestamp = initial_value[1]
-        usdtBalance, bitcoinBalance, balance_df = rebalancePortfolio(filtered_data.index[0], 0.5, timestamp, usdtBalance, bitcoinBalance, balance_df)
+        initial_trend = initial_value[3]
+        if initial_trend == 0:
+            init_perc = 0.5
+        elif initial_trend == 0.5:
+            init_perc = 0.75
+        elif initial_trend == -0.5:
+            init_perc = 0.25
+        elif initial_trend == 1:
+            init_perc = 1
+        elif initial_trend == -1:
+            init_perc = 0
+        usdtBalance, bitcoinBalance, balance_df = rebalancePortfolio(filtered_data.index[0], init_perc, timestamp, usdtBalance, bitcoinBalance, balance_df)
 
         for i in range(1, len(filtered_data)):
             valueNow = getValue(filtered_data.index[i])
@@ -128,6 +139,17 @@ def strategy1(start_date, end_date, initial_balance):
             time.sleep(0.1)
 
     return balance_df
+
+# Function to calculate drawdown
+def calculate_drawdown(balance_df):
+    balance_df['assetValue'] = balance_df['assetValue'].astype(float)
+    peak = balance_df['assetValue'].expanding(min_periods=1).max()
+    drawdown = balance_df['assetValue'] - peak
+    drawdown_percentage = drawdown / peak * 100
+    max_drawdown = drawdown.min()
+    max_drawdown_percentage = drawdown_percentage.min()
+
+    return max_drawdown, max_drawdown_percentage
 
 app = dash.Dash(__name__)
 
@@ -177,12 +199,16 @@ app.layout = html.Div([
         ],
         data=[],
         page_size=10
-    )
+    ),
+    
+    html.H2("Drawdown Details"),
+    html.Div(id='drawdown-details')
 ])
 
 @app.callback(
     Output('portfolio-value-graph', 'figure'),
     Output('transaction-table', 'data'),
+    Output('drawdown-details', 'children'),
     Input('run-button', 'n_clicks'),
     Input('start-date-picker', 'date'),
     Input('end-date-picker', 'date'),
@@ -192,7 +218,7 @@ def update_graph(n_clicks, start_date, end_date, initial_amount):
     if n_clicks > 0:
         balance_df = strategy1(start_date, end_date, initial_amount)
         if balance_df.empty:
-            return go.Figure(), []
+            return go.Figure(), [], "No transactions occurred during this period."
 
         balance_df['timestamp'] = pd.to_datetime(balance_df['timestamp'], unit='s')
         fig = px.line(balance_df, x='timestamp', y='assetValue', title='Portfolio Growth Over Time')
@@ -200,9 +226,14 @@ def update_graph(n_clicks, start_date, end_date, initial_amount):
         fig.update_yaxes(title='Portfolio Value (USDT)')
 
         table_data = balance_df.to_dict('records')
-        return fig, table_data
+        
+        max_drawdown, max_drawdown_percentage = calculate_drawdown(balance_df)
+        drawdown_text = f"Max Drawdown: {max_drawdown:.2f} USDT ({max_drawdown_percentage:.2f}%)"
 
-    return go.Figure(), []
+        return fig, table_data, drawdown_text
+
+    return go.Figure(), [], ""
 
 if __name__ == '__main__':
     app.run_server(debug=True)
+    
