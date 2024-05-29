@@ -136,7 +136,54 @@ def strategy1(start_date, end_date, initial_balance):
                     usdtBalance, bitcoinBalance, balance_df = rebalancePortfolio(filtered_data.index[i], 1, currTimestamp, usdtBalance, bitcoinBalance, balance_df)
                 elif currentTrend == -1:
                     usdtBalance, bitcoinBalance, balance_df = rebalancePortfolio(filtered_data.index[i], 0, currTimestamp, usdtBalance, bitcoinBalance, balance_df)
-            time.sleep(0.1)
+
+
+    return balance_df
+
+# Second strategy function
+def strategy2(start_date, end_date, initial_balance):
+    # Convert date strings to datetime objects
+    start_date = pd.to_datetime(start_date)
+    end_date = pd.to_datetime(end_date)
+
+    # Filter data by date range
+    filtered_data = data[(data['Date'] >= start_date) & (data['Date'] <= end_date)]
+    balance_df = pd.DataFrame(columns=['timestamp', 'usdtBalance', 'bitcoinBalance', 'bitcoinValue', 'assetValue'])
+
+    usdtBalance = initial_balance
+    bitcoinBalance = 0.0
+
+    if not filtered_data.empty:
+        initial_value = getValue(filtered_data.index[0])
+        timestamp = initial_value[1]
+        initial_trend = initial_value[3]
+        if initial_trend in [0, -0.5, 0.5]:
+            init_perc = 0.5
+        elif initial_trend == 1:
+            init_perc = 1
+        elif initial_trend == -1:
+            init_perc = 0
+        usdtBalance, bitcoinBalance, balance_df = rebalancePortfolio(filtered_data.index[0], init_perc, timestamp, usdtBalance, bitcoinBalance, balance_df)
+
+        for i in range(3, len(filtered_data)):
+            valueNow = getValue(filtered_data.index[i])
+            valueThen = getValue(filtered_data.index[i-1])
+            currentTrend = valueNow[3]
+            lastTrend = valueThen[3]
+            if currentTrend == lastTrend:
+                balance_df = updateBitcoinValue(filtered_data.index[i], balance_df)
+            else:
+                balanceLast = getBalanceAsset(len(balance_df) - 1, balance_df)
+                usdtBalance = float(balanceLast['usdtBalance'])
+                bitcoinBalance = float(balanceLast['bitcoinBalance'])
+                currTimestamp = valueNow[1]
+                if currentTrend in [0, -0.5, 0.5]:
+                    usdtBalance, bitcoinBalance, balance_df = rebalancePortfolio(filtered_data.index[i], 0.5, currTimestamp, usdtBalance, bitcoinBalance, balance_df)
+                elif currentTrend == 1:
+                    usdtBalance, bitcoinBalance, balance_df = rebalancePortfolio(filtered_data.index[i], 1, currTimestamp, usdtBalance, bitcoinBalance, balance_df)
+                elif currentTrend == -1:
+                    usdtBalance, bitcoinBalance, balance_df = rebalancePortfolio(filtered_data.index[i], 0, currTimestamp, usdtBalance, bitcoinBalance, balance_df)
+
 
     return balance_df
 
@@ -183,6 +230,18 @@ app.layout = html.Div([
         dcc.Input(id='initial-amount', type='number', value=10000)
     ]),
     
+    html.Div([
+        html.Label("Select Strategy"),
+        dcc.Dropdown(
+            id='strategy-dropdown',
+            options=[
+                {'label': 'NOBI Adjustment', 'value': 'strategy1'},
+                {'label': 'Original Coindesk', 'value': 'strategy2'}
+            ],
+            value='strategy1'
+        )
+    ]),
+    
     html.Button('Run Strategy', id='run-button', n_clicks=0),
     
     dcc.Graph(id='portfolio-value-graph'),
@@ -212,11 +271,16 @@ app.layout = html.Div([
     Input('run-button', 'n_clicks'),
     Input('start-date-picker', 'date'),
     Input('end-date-picker', 'date'),
-    Input('initial-amount', 'value')
+    Input('initial-amount', 'value'),
+    Input('strategy-dropdown', 'value')
 )
-def update_graph(n_clicks, start_date, end_date, initial_amount):
+def update_graph(n_clicks, start_date, end_date, initial_amount, strategy):
     if n_clicks > 0:
-        balance_df = strategy1(start_date, end_date, initial_amount)
+        if strategy == 'strategy1':
+            balance_df = strategy1(start_date, end_date, initial_amount)
+        else:
+            balance_df = strategy2(start_date, end_date, initial_amount)
+
         if balance_df.empty:
             return go.Figure(), [], "No transactions occurred during this period."
 
@@ -236,4 +300,3 @@ def update_graph(n_clicks, start_date, end_date, initial_amount):
 
 if __name__ == '__main__':
     app.run_server(debug=True)
-    
