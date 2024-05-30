@@ -12,20 +12,17 @@ import time
 data = pd.read_csv('trend_indicators.csv')
 data['Date'] = pd.to_datetime(data['Date'])
 
-# Function to get value by index
 def getValue(index):
     if index >= len(data):
         return None
     row = data.iloc[index]
     return [row['Date'], row['Date'].timestamp(), row['Price'], row['Trend Indicator']]
 
-# Function to get balance asset
 def getBalanceAsset(index, balance_df):
     if index < 0 or index >= len(balance_df):
         return None
     return balance_df.iloc[index]
 
-# Rebalance portfolio function
 def rebalancePortfolio(index, target_btc_ratio, timestamp, usdtBalance, btcBalance, balance_df):
     value = getValue(index)
     if value is None or len(value) < 4:
@@ -42,7 +39,6 @@ def rebalancePortfolio(index, target_btc_ratio, timestamp, usdtBalance, btcBalan
     btcValue = btcBalance * currentBTCPrice
     finalValue = usdtBalance + btcValue
 
-    # Append to balance_df using concat
     new_entry = pd.DataFrame({
         'timestamp': [timestamp],
         'usdtBalance': [usdtBalance],
@@ -54,7 +50,6 @@ def rebalancePortfolio(index, target_btc_ratio, timestamp, usdtBalance, btcBalan
 
     return usdtBalance, btcBalance, balance_df
 
-# Update Bitcoin value function
 def updateBitcoinValue(index, balance_df):
     value = getValue(index)
     if value is None or len(value) < 4:
@@ -73,7 +68,6 @@ def updateBitcoinValue(index, balance_df):
     currentBTCValue = lastBTCAmount * currentBTCPrice
     totalAmount = currentBTCValue + lastUSDTAmount
 
-    # Append to balance_df using concat
     new_entry = pd.DataFrame({
         'timestamp': [currentTimestamp],
         'usdtBalance': [lastUSDTAmount],
@@ -85,9 +79,7 @@ def updateBitcoinValue(index, balance_df):
 
     return balance_df
 
-# Main strategy function
 def strategy1(start_date, end_date, initial_balance):
-    # Convert date strings to datetime objects
     start_date = pd.to_datetime(start_date)
     end_date = pd.to_datetime(end_date)
 
@@ -140,9 +132,7 @@ def strategy1(start_date, end_date, initial_balance):
 
     return balance_df
 
-# Second strategy function
 def strategy2(start_date, end_date, initial_balance):
-    # Convert date strings to datetime objects
     start_date = pd.to_datetime(start_date)
     end_date = pd.to_datetime(end_date)
 
@@ -187,7 +177,6 @@ def strategy2(start_date, end_date, initial_balance):
 
     return balance_df
 
-# Function to calculate drawdown
 def calculate_drawdown(balance_df):
     balance_df['assetValue'] = balance_df['assetValue'].astype(float)
     peak = balance_df['assetValue'].expanding(min_periods=1).max()
