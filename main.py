@@ -299,4 +299,4 @@ def update_graph(n_clicks, start_date, end_date, initial_amount, strategy):
     return go.Figure(), [], ""
 
 if __name__ == '__main__':
-    app.run_server(debug=True)
+    app.run_server(debug=True, host="0.0.0.0")
